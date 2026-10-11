@@ -7,6 +7,8 @@ import UserNotifications
     @Published var error: String?
     @Published var reminders = false
     @Published var permission = UNAuthorizationStatus.notDetermined
+    /// Set at a good moment to ask for a rating; RootView asks iOS and resets it.
+    @Published var reviewMoment = false
     private var clock: Timer?
     private var loadBlocked = false
     private let url: URL
@@ -38,6 +40,7 @@ import UserNotifications
         data.records[key,default:[:]][h.id] = max(0,min(99999,value))
         if !complete(h,date) { data.completedAt[key]?[h.id] = nil } else if !was { data.completedAt[key,default:[:]][h.id] = Date().timeIntervalSince1970 * 1000 }
         save()
+        if !was && complete(h,date) && key == Day.key(Date()) && [7, 30, 100].contains(streak(h)) { reviewMoment = true }
     }
     /// When the target was reached, if it was reached on that same day (not a later catch-up).
     func doneAt(_ h: Habit, _ date: Date = Date()) -> Date? {
@@ -107,6 +110,7 @@ import UserNotifications
         setAmount(h,h.isMinutes ? amount(h,date)+t.focusedMinutes : max(amount(h,date),h.target),date)
         t.logged = true; data.timer = t
         if let i = data.sessions.firstIndex(where:{$0.id == t.sessionId}) { data.sessions[i].logged = true }; save()
+        if data.sessions.filter(\.logged).count == 3 { reviewMoment = true }
     }
     func requestReminders() async {
         do { reminders = try await UNUserNotificationCenter.current().requestAuthorization(options:[.alert,.sound,.badge]); permission = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus; if !reminders { error = "Notifications are disabled. Enable them in iPhone Settings to receive reminders." }; data.remindersEnabled = reminders; save(); scheduleReminders() } catch { self.error = error.localizedDescription }

@@ -1,9 +1,12 @@
+import StoreKit
 import SwiftUI
 import UniformTypeIdentifiers
 import UserNotifications
 
 struct RootView: View {
     @EnvironmentObject var store: HabitStore
+    @Environment(\.requestReview) var requestReview
+    @AppStorage("reviewRequestedVersion") var reviewRequestedVersion = ""
     var body: some View {
         Group {
             if store.data.onboarded {
@@ -18,6 +21,15 @@ struct RootView: View {
             }
         }
         .errorAlert(store)
+        .onChange(of:store.reviewMoment) { _, moment in
+            guard moment else { return }
+            store.reviewMoment = false
+            // Once per version; iOS also limits how often the sheet actually appears.
+            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+            guard reviewRequestedVersion != version else { return }
+            reviewRequestedVersion = version
+            Task { try? await Task.sleep(for:.seconds(1.5)); requestReview() }
+        }
         .preferredColorScheme(["light": .light, "dark": .dark][store.data.prefs.appearance] ?? nil)
     }
 }
@@ -237,6 +249,11 @@ struct SettingsView: View {
     var permissionText: String {
         switch store.permission { case .authorized, .provisional, .ephemeral: return "Allowed"; case .denied: return "Off in iPhone Settings"; default: return "Not requested yet" }
     }
+    static let otherApps = [
+        (id:"6806044644", name:"SelfMastery 30", detail:"30 days. One meaningful change.", symbol:"target"),
+        (id:"6819523988", name:"OathSteps", detail:"Citizenship test prep", symbol:"flag"),
+        (id:"6765990601", name:"Azan: Prayer Times", detail:"Prayer times, wherever you are", symbol:"moon.stars"),
+    ]
     func pref<T>(_ key: WritableKeyPath<Preferences, T>) -> Binding<T> {
         Binding(get:{ store.data.prefs[keyPath:key] }, set:{ store.data.prefs[keyPath:key] = $0; store.save(); store.scheduleReminders() })
     }
@@ -274,8 +291,20 @@ struct SettingsView: View {
                     Button("Import backup", systemImage:"square.and.arrow.down") { importing = true }
                     Button("Erase all data…", role:.destructive) { erase = true }
                 } header: { Text("Data") } footer: { Text(store.data.prefs.iCloud ? "Synced through your iCloud account. The newest copy wins if two devices change at once." : "Records stay on this iPhone. Export a backup to move data from the web tracker.") }
+                Section("More from the developer") {
+                    ForEach(Self.otherApps, id:\.id) { app in
+                        Link(destination:URL(string:"https://apps.apple.com/app/id\(app.id)")!) {
+                            HStack(spacing:12) {
+                                Image(systemName:app.symbol).font(.headline).foregroundStyle(Palette.teal).frame(width:36, height:36).background(Palette.tealTint, in:RoundedRectangle(cornerRadius:10))
+                                VStack(alignment:.leading, spacing:1) { Text(app.name).font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text); Text(app.detail).font(.footnote).foregroundStyle(Palette.secondary) }
+                                Spacer()
+                                Image(systemName:"arrow.up.right").font(.footnote).foregroundStyle(Palette.secondary)
+                            }
+                        }.accessibilityHint("Opens the App Store")
+                    }
+                }
                 Section {
-                    Text("Daymark · 1.0").font(.footnote).foregroundStyle(Palette.secondary)
+                    Text("Daymark · " + (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")).font(.footnote).foregroundStyle(Palette.secondary)
                 }
             }
             .scrollContentBackground(.hidden).background(Palette.grouped)

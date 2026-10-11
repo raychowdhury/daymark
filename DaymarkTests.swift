@@ -122,5 +122,26 @@ final class DaymarkTests: XCTestCase {
         store.setAmount(stretch, 1)
         XCTAssertEqual(store.dayState(Date()), .full)
     }
+    @MainActor func testSevenDayStreakIsAReviewMoment() {
+        let store = makeStore()
+        let walk = Habit(name:"Walk", createdAt:Day.key(Calendar.current.date(byAdding:.day, value:-10, to:Date())!))
+        store.upsert(walk)
+        for back in (1...6).reversed() { store.setAmount(walk, 1, Calendar.current.date(byAdding:.day, value:-back, to:Date())!) }
+        XCTAssertFalse(store.reviewMoment)   // catch-up check-ins on past days never prompt
+        store.setAmount(walk, 1)
+        XCTAssertEqual(store.streak(walk), 7)
+        XCTAssertTrue(store.reviewMoment)
+    }
+    @MainActor func testThirdLoggedSessionIsAReviewMoment() {
+        let store = makeStore()
+        let study = Habit(name:"Study", type:"count", target:500, unit:"minutes")
+        store.upsert(study)
+        for n in 1...3 {
+            store.start(study, minutes:10)
+            store.data.timer?.endsAt = Date().timeIntervalSince1970 * 1000 + 5 * 60000
+            store.finish("stopped"); store.logTimer(); store.dismissTimer()
+            XCTAssertEqual(store.reviewMoment, n == 3, "after session \(n)")
+        }
+    }
     func testRejectsImpossibleDates() { XCTAssertNil(Day.date("2026-02-30")); XCTAssertNil(Day.date("2026-13-01")) }
 }
