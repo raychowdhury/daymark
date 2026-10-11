@@ -26,6 +26,8 @@ Built to the Daymark design canvas (light and dark tokens, SF Pro, SF Symbols, 4
 - Settings: name; reminder switch, permission status and lead time; default focus length, Lock Screen timer, end-of-session sound; week start (Monday or Sunday) and appearance; iCloud sync; CSV history export; JSON backup export/import; erase all data.
 - Lock Screen and Dynamic Island: a Live Activity counts down the running focus session (the `DaymarkWidgets` extension).
 - Check-off cards show when a habit was completed ("Done 7:52 AM").
+- Ratings: after a 7-, 30- or 100-day streak is reached today, or the third logged focus session, Daymark asks iOS for the standard rating sheet, at most once per app version (iOS decides whether it shows).
+- Settings links to the developer's other apps on the App Store.
 
 ## Move data from the web tracker
 
